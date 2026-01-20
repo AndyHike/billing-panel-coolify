@@ -16,7 +16,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 
 # Встановлюємо залежності
-RUN npm ci
+RUN npm install
 
 # Build the application
 FROM base AS builder
