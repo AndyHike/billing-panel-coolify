@@ -54,8 +54,10 @@ class CoolifyClient {
   // Отримати всі проекти
   async getProjects(): Promise<CoolifyProject[]> {
     try {
-      const data = await this.request('/projects')
-      return data.data || data || []
+      const data = await this.request('/api/v1/projects')
+      console.log('[v0] Coolify projects response:', JSON.stringify(data))
+      // Coolify повертає масив напряму
+      return Array.isArray(data) ? data : (data.data || [])
     } catch (error) {
       console.error('[v0] Error fetching Coolify projects:', error)
       return []
@@ -65,8 +67,10 @@ class CoolifyClient {
   // Отримати проект за UUID
   async getProject(uuid: string): Promise<CoolifyProject | null> {
     try {
-      const data = await this.request(`/projects/${uuid}`)
-      return data.data || data || null
+      const data = await this.request(`/api/v1/projects/${uuid}`)
+      console.log(`[v0] Coolify project ${uuid} response:`, JSON.stringify(data))
+      // Coolify повертає об'єкт напряму
+      return data || null
     } catch (error) {
       console.error(`[v0] Error fetching project ${uuid}:`, error)
       return null
