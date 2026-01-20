@@ -149,37 +149,17 @@ class CoolifyClient {
     try {
       console.log(`[v0] Stopping project ${projectUuid}`)
       
-      // Крок 1: Отримуємо проект та його середовища
-      const project = await this.getProject(projectUuid)
-      if (!project || !project.environments) {
-        console.error('[v0] Project not found or no environments')
-        return false
-      }
-
-      // Крок 2: Збираємо всі ID середовищ цього проекту
-      const envIds = (project.environments as any[]).map((e: any) => e.id)
-      console.log('[v0] Environment IDs:', envIds)
-
-      // Крок 3: Отримуємо всі ресурси і фільтруємо за знайденими ID
       const allResources = await this.getAllResources()
-      const projectResources = allResources.filter((r: any) => envIds.includes(r.environment_id))
-      console.log(`[v0] Found ${projectResources.length} resources for project`)
-
-      // Крок 4: Зупиняємо кожен ресурс залежно від його типу
-      const promises = projectResources.map(async (resource: any) => {
-        let category = 'applications'
-        if (resource.type === 'service') category = 'services'
-        if (resource.type === 'database') category = 'databases'
-
-        console.log(`[v0] Stopping ${category}/${resource.uuid}`)
-        return this.request(`/api/v1/${category}/${resource.uuid}/stop`, {
-          method: 'POST'
-        })
-      })
-
-      await Promise.all(promises)
-      console.log(`[v0] Successfully stopped all resources for project ${projectUuid}`)
-      return true
+      const projectResources = allResources.filter((r: any) => r.project_uuid === projectUuid)
+      console.log(`[v0] Found ${projectResources.length} resources to stop in project ${projectUuid}`)
+      
+      // Передаємо весь об'єкт, щоб метод stopResource знав і тип, і статус
+      const stopPromises = projectResources.map(resource => this.stopResource(resource))
+      
+      const results = await Promise.all(stopPromises)
+      const success = results.every(res => res === true)
+      console.log(`[v0] Project ${projectUuid} stop result: ${success}`)
+      return success
     } catch (error) {
       console.error(`[v0] Error stopping project ${projectUuid}:`, error)
       return false
@@ -190,37 +170,17 @@ class CoolifyClient {
     try {
       console.log(`[v0] Starting project ${projectUuid}`)
       
-      // Крок 1: Отримуємо проект та його середовища
-      const project = await this.getProject(projectUuid)
-      if (!project || !project.environments) {
-        console.error('[v0] Project not found or no environments')
-        return false
-      }
-
-      // Крок 2: Збираємо всі ID середовищ цього проекту
-      const envIds = (project.environments as any[]).map((e: any) => e.id)
-      console.log('[v0] Environment IDs:', envIds)
-
-      // Крок 3: Отримуємо всі ресурси і фільтруємо за знайденими ID
       const allResources = await this.getAllResources()
-      const projectResources = allResources.filter((r: any) => envIds.includes(r.environment_id))
-      console.log(`[v0] Found ${projectResources.length} resources for project`)
-
-      // Крок 4: Запускаємо кожен ресурс залежно від його типу
-      const promises = projectResources.map(async (resource: any) => {
-        let category = 'applications'
-        if (resource.type === 'service') category = 'services'
-        if (resource.type === 'database') category = 'databases'
-
-        console.log(`[v0] Starting ${category}/${resource.uuid}`)
-        return this.request(`/api/v1/${category}/${resource.uuid}/start`, {
-          method: 'POST'
-        })
-      })
-
-      await Promise.all(promises)
-      console.log(`[v0] Successfully started all resources for project ${projectUuid}`)
-      return true
+      const projectResources = allResources.filter((r: any) => r.project_uuid === projectUuid)
+      console.log(`[v0] Found ${projectResources.length} resources to start in project ${projectUuid}`)
+      
+      // Передаємо весь об'єкт, щоб метод startResource знав і тип, і статус
+      const startPromises = projectResources.map(resource => this.startResource(resource))
+      
+      const results = await Promise.all(startPromises)
+      const success = results.every(res => res === true)
+      console.log(`[v0] Project ${projectUuid} start result: ${success}`)
+      return success
     } catch (error) {
       console.error(`[v0] Error starting project ${projectUuid}:`, error)
       return false
@@ -263,20 +223,60 @@ class CoolifyClient {
     }
   }
 
-  async stopResource(resourceUuid: string): Promise<boolean> {
+  async stopResource(resource: any): Promise<boolean> {
     try {
-      return await this.stopService(resourceUuid)
+      // 1. Перевіряємо, чи ресурс уже зупинений
+      if (resource.status && resource.status.toLowerCase().includes('exited')) {
+        console.log(`[v0] ${resource.name} is already stopped (Status: ${resource.status})`)
+        return true
+      }
+
+      // 2. Визначаємо правильну категорію для API
+      let category = 'applications'
+      const type = resource.type.toLowerCase()
+
+      if (type.includes('postgresql') || type.includes('database')) {
+        category = 'databases'
+      } else if (type === 'service') {
+        category = 'services'
+      }
+
+      const endpoint = `/api/v1/${category}/${resource.uuid}/stop`
+      console.log(`[v0] Stopping ${category}/${resource.uuid} (${resource.name})`)
+
+      await this.request(endpoint, { method: 'POST' })
+      return true
     } catch (error) {
-      console.error(`[v0] Error stopping resource ${resourceUuid}:`, error)
+      console.error(`[v0] Error stopping resource ${resource.name}:`, error)
       return false
     }
   }
 
-  async startResource(resourceUuid: string): Promise<boolean> {
+  async startResource(resource: any): Promise<boolean> {
     try {
-      return await this.startService(resourceUuid)
+      // 1. Перевіряємо, чи ресурс уже запущений
+      if (resource.status && resource.status.toLowerCase().includes('running')) {
+        console.log(`[v0] ${resource.name} is already running (Status: ${resource.status})`)
+        return true
+      }
+
+      // 2. Визначаємо категорію
+      let category = 'applications'
+      const type = resource.type.toLowerCase()
+
+      if (type.includes('postgresql') || type.includes('database')) {
+        category = 'databases'
+      } else if (type === 'service') {
+        category = 'services'
+      }
+
+      const endpoint = `/api/v1/${category}/${resource.uuid}/start`
+      console.log(`[v0] Starting ${category}/${resource.uuid} (${resource.name})`)
+
+      await this.request(endpoint, { method: 'POST' })
+      return true
     } catch (error) {
-      console.error(`[v0] Error starting resource ${resourceUuid}:`, error)
+      console.error(`[v0] Error starting resource ${resource.name}:`, error)
       return false
     }
   }
