@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { query } from '@/lib/db'
 
 // Health check endpoint для Docker
 export async function GET() {
   try {
     // Перевіряємо підключення до БД
-    await prisma.$queryRaw`SELECT 1`
+    await query('SELECT 1')
     
     return NextResponse.json({ 
       status: 'healthy',

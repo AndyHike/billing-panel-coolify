@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma'
+import { query } from '@/lib/db'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
@@ -6,18 +6,17 @@ import { Plus } from 'lucide-react'
 import { ClientsList } from '@/components/dashboard/clients-list'
 
 async function getClients() {
-  return prisma.client.findMany({
-    include: {
-      projects: {
-        include: {
-          project: true,
-        },
-      },
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
-  })
+  const result = await query(`
+    SELECT 
+      c.*,
+      COUNT(cp.id) as projects_count
+    FROM clients c
+    LEFT JOIN client_projects cp ON c.id = cp.client_id
+    GROUP BY c.id
+    ORDER BY c.created_at DESC
+  `)
+  
+  return result.rows
 }
 
 export default async function ClientsPage() {
