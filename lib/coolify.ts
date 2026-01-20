@@ -48,7 +48,7 @@ class CoolifyClient {
         ...options,
         signal: controller.signal,
         headers: {
-          'Authorization': this.token,
+          'Authorization': `Bearer ${this.token}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           ...options.headers,
