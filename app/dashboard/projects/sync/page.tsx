@@ -120,13 +120,23 @@ export default function SyncProjectsPage() {
             )}
           </Button>
 
-          <div className="text-sm text-muted-foreground">
-            <p className="font-medium mb-2">Що відбувається під час синхронізації:</p>
-            <ul className="list-disc list-inside space-y-1">
-              <li>Отримання списку всіх проектів з Coolify API</li>
-              <li>Додавання нових проектів в базу даних</li>
-              <li>Оновлення інформації про існуючі проекти</li>
-            </ul>
+          <div className="text-sm text-muted-foreground space-y-3">
+            <div>
+              <p className="font-medium mb-2">Що відбувається під час синхронізації:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Отримання списку всіх проектів з Coolify API</li>
+                <li>Додавання нових проектів в базу даних</li>
+                <li>Оновлення інформації про існуючі проекти</li>
+              </ul>
+            </div>
+            
+            <div className="p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md">
+              <p className="font-medium text-amber-900 dark:text-amber-100 mb-1">Проблеми з підключенням?</p>
+              <p className="text-xs text-amber-800 dark:text-amber-200">
+                Якщо отримуєте помилку Connect Timeout, перевірте змінну COOLIFY_API_URL в налаштуваннях проекту. 
+                Для Docker використовуйте: http://host.docker.internal:8000 або http://172.17.0.1:8000
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>

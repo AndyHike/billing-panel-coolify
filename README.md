@@ -72,10 +72,17 @@ npm run dev
    ```
    DATABASE_URL=postgres://...
    JWT_SECRET=your-secret-key
-   COOLIFY_API_URL=http://coolify-api:8000
+   COOLIFY_API_URL=http://host.docker.internal:8000
    COOLIFY_API_TOKEN=your-token
    CRON_SECRET=your-cron-secret
    ```
+   
+   **ВАЖЛИВО - COOLIFY_API_URL:**
+   - Якщо деплоїте В САМОМУ Coolify, використовуйте:
+     - `http://host.docker.internal:8000` (для доступу до хоста з контейнера)
+     - АБО `http://172.17.0.1:8000` (Docker bridge IP)
+     - АБО внутрішню адресу вашого Coolify сервісу
+   - НЕ використовуйте зовнішній IP (`http://31.97.129.75:8000`) - Docker контейнер не зможе підключитися!
 
 3. **Build Command:**
    ```
@@ -234,10 +241,28 @@ await query('SELECT * FROM users WHERE email = $1', [email])
 - Переконайтесь що БД доступна з контейнера
 - Для зовнішнього доступу використовуйте публічний URL з SSL
 
-### Проекти не синхронізуються
-- Перевірте `COOLIFY_API_URL` та `COOLIFY_API_TOKEN`
-- Переконайтеся що токен має необхідні права
-- Перевірте доступність Coolify API
+### Проекти не синхронізуються (Connect Timeout Error)
+**Причина:** Docker контейнер не може підключитися до Coolify API
+
+**Рішення:**
+1. Якщо деплоїте В САМОМУ Coolify, змініть `COOLIFY_API_URL`:
+   - Спробуйте `http://host.docker.internal:8000`
+   - Або `http://172.17.0.1:8000`
+   - НЕ використовуйте зовнішній IP!
+
+2. Перевірте токен:
+   - `COOLIFY_API_TOKEN` повинен бути валідним
+   - Створіть в Coolify: Settings → API → Create Token
+   
+3. Тест підключення:
+   ```bash
+   # З контейнера спробуйте:
+   curl -H "Authorization: YOUR_TOKEN" http://host.docker.internal:8000/api/v1/projects
+   ```
+
+4. Перевірте логи для діагностики:
+   - Дивіться в логи додатку для деталей помилки
+   - Шукайте "Coolify API request" та "Connect Timeout"
 
 ### Не працює автоматична пауза
 - Налаштуйте cron job з правильним `CRON_SECRET`

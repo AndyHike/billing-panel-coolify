@@ -41,12 +41,20 @@ export default async function ProjectsPage() {
             Всі проекти з Coolify
           </p>
         </div>
-        <Link href="/dashboard/projects/sync">
-          <Button>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Синхронізувати
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/dashboard/projects/new">
+            <Button variant="outline">
+              <FolderGit2 className="mr-2 h-4 w-4" />
+              Додати вручну
+            </Button>
+          </Link>
+          <Link href="/dashboard/projects/sync">
+            <Button>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Синхронізувати
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {projects.length === 0 ? (
@@ -57,11 +65,17 @@ export default async function ProjectsPage() {
               Синхронізуйте проекти з Coolify щоб побачити їх тут
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex gap-2">
             <Link href="/dashboard/projects/sync">
               <Button>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Синхронізувати проекти
+              </Button>
+            </Link>
+            <Link href="/dashboard/projects/new">
+              <Button variant="outline">
+                <FolderGit2 className="mr-2 h-4 w-4" />
+                Додати вручну
               </Button>
             </Link>
           </CardContent>
