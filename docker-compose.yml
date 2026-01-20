@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: coolify-admin
+    restart: unless-stopped
+    
+    # Порт
+    ports:
+      - "3000:3000"
+    
+    # Змінні середовища (будуть замінені Coolify)
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - COOLIFY_API_URL=${COOLIFY_API_URL}
+      - COOLIFY_API_TOKEN=${COOLIFY_API_TOKEN}
+      - CRON_SECRET=${CRON_SECRET}
+    
+    # Labels для Traefik (автоматичний HTTPS через Coolify)
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.coolify-admin.rule=Host(`${APP_DOMAIN}`)"
+      - "traefik.http.routers.coolify-admin.entrypoints=websecure"
+      - "traefik.http.routers.coolify-admin.tls=true"
+      - "traefik.http.routers.coolify-admin.tls.certresolver=letsencrypt"
+      - "traefik.http.services.coolify-admin.loadbalancer.server.port=3000"
+    
+    # Підключення до зовнішньої мережі Coolify
+    networks:
+      - coolify
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# Зовнішня мережа Coolify (створена Coolify)
+networks:
+  coolify:
+    external: true
