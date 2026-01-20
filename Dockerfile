@@ -1,8 +1,7 @@
-# Dockerfile для Coolify Admin Panel на базі Debian Slim
+# Dockerfile для Coolify (Next.js 16 + Tailwind 4)
 FROM node:20-bookworm-slim AS base
 
-# Встановлюємо залежності для PostgreSQL та інструменти збірки для pg-native
-# Нам потрібні python3, build-essential та libpq-dev для node-gyp
+# Встановлюємо системні залежності
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     build-essential \
@@ -10,52 +9,55 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
+# Встановлюємо pnpm
+RUN npm install -g pnpm
+
 WORKDIR /app
 
-# Етап встановлення залежностей
+# --- Етап залежностей ---
 FROM base AS deps
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
+# Копіюємо файли конфігурації пакетів
+COPY package.json pnpm-lock.yaml* ./
 
-# Встановлюємо залежності (тепер pg-native зможе скомпілюватися)
-RUN npm install
+# Встановлюємо ВСІ залежності (включаючи devDependencies для Tailwind)
+# Використовуємо --frozen-lockfile для стабільності
+RUN pnpm install --frozen-lockfile
 
-# Етап збірки додатку
+# --- Етап збірки ---
 FROM base AS builder
 WORKDIR /app
 
+# Копіюємо залежності з попереднього етапу
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Вимикаємо телеметрію
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN npm run build
+# Запускаємо білд (тепер всі плагіни Tailwind будуть на місці)
+RUN pnpm run build
 
-# Production образ
+# --- Етап Production ---
 FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Створюємо non-root user (синтаксис Debian відрізняється від Alpine)
 RUN groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 --gid nodejs nextjs
 
 COPY --from=builder /app/public ./public
-
-# Створюємо .next директорію з правильними правами
 RUN mkdir .next && chown nextjs:nodejs .next
 
-# Копіюємо білд (standalone режим Next.js)
+# Копіюємо результати збірки (Next.js standalone)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
-
 EXPOSE 3000
-
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
