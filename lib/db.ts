@@ -4,19 +4,21 @@ let poolInstance: Pool | null = null
 
 export function getDb() {
   if (!poolInstance) {
-    const connectionString = process.env.DATABASE_URL
+    let connectionString = process.env.DATABASE_URL
     
-    // Якщо DATABASE_URL вже містить sslmode, не додаємо ssl параметр окремо
-    const hasSSLMode = connectionString?.includes('sslmode=')
+    // Видаляємо sslmode з URL, якщо він є, бо ми налаштуємо SSL окремо
+    if (connectionString?.includes('sslmode=')) {
+      const url = new URL(connectionString)
+      url.searchParams.delete('sslmode')
+      connectionString = url.toString()
+    }
     
     poolInstance = new Pool({
       connectionString,
-      // Використовуємо ssl тільки якщо в URL немає sslmode
-      ...(hasSSLMode ? {} : {
-        ssl: {
-          rejectUnauthorized: false
-        }
-      }),
+      // Завжди використовуємо SSL але без перевірки сертифікату
+      ssl: {
+        rejectUnauthorized: false
+      },
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
