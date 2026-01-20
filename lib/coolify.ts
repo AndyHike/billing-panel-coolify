@@ -119,17 +119,36 @@ class CoolifyClient {
     }
   }
 
+  async stopApplication(applicationUuid: string): Promise<boolean> {
+    try {
+      await this.request(`/api/v1/applications/${applicationUuid}/stop`, {
+        method: 'GET',
+      })
+      console.log(`[v0] Successfully stopped application ${applicationUuid}`)
+      return true
+    } catch (error) {
+      console.error(`[v0] Error stopping application ${applicationUuid}:`, error)
+      return false
+    }
+  }
+
+  async startApplication(applicationUuid: string): Promise<boolean> {
+    try {
+      await this.request(`/api/v1/applications/${applicationUuid}/start`, {
+        method: 'GET',
+      })
+      console.log(`[v0] Successfully started application ${applicationUuid}`)
+      return true
+    } catch (error) {
+      console.error(`[v0] Error starting application ${applicationUuid}:`, error)
+      return false
+    }
+  }
+
   async stopProject(projectUuid: string): Promise<boolean> {
     try {
-      const resources = await this.getProjectResources(projectUuid)
-      
-      const stopPromises = resources.map(resource => 
-        this.stopResource(resource.uuid)
-      )
-      
-      await Promise.all(stopPromises)
-      console.log(`[v0] Successfully stopped all resources for project ${projectUuid}`)
-      return true
+      // Спробуємо спочатку як додаток
+      return await this.stopApplication(projectUuid)
     } catch (error) {
       console.error(`[v0] Error stopping project ${projectUuid}:`, error)
       return false
@@ -138,15 +157,8 @@ class CoolifyClient {
 
   async startProject(projectUuid: string): Promise<boolean> {
     try {
-      const resources = await this.getProjectResources(projectUuid)
-      
-      const startPromises = resources.map(resource => 
-        this.startResource(resource.uuid)
-      )
-      
-      await Promise.all(startPromises)
-      console.log(`[v0] Successfully started all resources for project ${projectUuid}`)
-      return true
+      // Спробуємо спочатку як додаток
+      return await this.startApplication(projectUuid)
     } catch (error) {
       console.error(`[v0] Error starting project ${projectUuid}:`, error)
       return false
