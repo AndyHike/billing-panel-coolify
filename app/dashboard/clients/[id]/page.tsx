@@ -41,13 +41,28 @@ async function getClient(id: string) {
     notes: client.notes,
     createdAt: client.created_at,
     updatedAt: client.updated_at,
-    projects: projectsResult.rows,
+    projects: projectsResult.rows.map(p => ({
+      id: p.id,
+      startDate: p.start_date,
+      endDate: p.end_date,
+      isActive: p.status === 'active',
+      isPaused: p.status === 'paused',
+      project: {
+        id: p.project_id,
+        name: p.project_name,
+        coolifyUuid: p.coolify_uuid,
+      }
+    })),
   }
 }
 
 async function getAvailableProjects() {
-  const result = await query('SELECT * FROM projects ORDER BY name ASC')
-  return result.rows
+  const result = await query('SELECT id, name, coolify_uuid FROM projects ORDER BY name ASC')
+  return result.rows.map(p => ({
+    id: p.id,
+    name: p.name,
+    coolifyUuid: p.coolify_uuid,
+  }))
 }
 
 export default async function ClientDetailPage({

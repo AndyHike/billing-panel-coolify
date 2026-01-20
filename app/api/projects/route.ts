@@ -2,6 +2,39 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
 
+// Отримати всі проекти
+export async function GET() {
+  try {
+    const user = await getCurrentUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const result = await query(
+      `SELECT 
+        id,
+        name,
+        coolify_uuid,
+        description,
+        created_at,
+        updated_at,
+        (SELECT COUNT(*) FROM client_projects cp WHERE cp.project_id = projects.id) as clients_count,
+        (SELECT COUNT(*) FROM client_projects cp WHERE cp.project_id = projects.id AND cp.status = 'active') as active_count
+       FROM projects 
+       ORDER BY name ASC`
+    )
+
+    return NextResponse.json(result.rows)
+  } catch (error) {
+    console.error('[v0] Error fetching projects:', error)
+    return NextResponse.json(
+      { error: 'Помилка отримання проектів' },
+      { status: 500 }
+    )
+  }
+}
+
+// Створити новий проект
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser()
