@@ -147,8 +147,39 @@ class CoolifyClient {
 
   async stopProject(projectUuid: string): Promise<boolean> {
     try {
-      // Спробуємо спочатку як додаток
-      return await this.stopApplication(projectUuid)
+      console.log(`[v0] Stopping project ${projectUuid}`)
+      
+      // Крок 1: Отримуємо проект та його середовища
+      const project = await this.getProject(projectUuid)
+      if (!project || !project.environments) {
+        console.error('[v0] Project not found or no environments')
+        return false
+      }
+
+      // Крок 2: Збираємо всі ID середовищ цього проекту
+      const envIds = (project.environments as any[]).map((e: any) => e.id)
+      console.log('[v0] Environment IDs:', envIds)
+
+      // Крок 3: Отримуємо всі ресурси і фільтруємо за знайденими ID
+      const allResources = await this.getAllResources()
+      const projectResources = allResources.filter((r: any) => envIds.includes(r.environment_id))
+      console.log(`[v0] Found ${projectResources.length} resources for project`)
+
+      // Крок 4: Зупиняємо кожен ресурс залежно від його типу
+      const promises = projectResources.map(async (resource: any) => {
+        let category = 'applications'
+        if (resource.type === 'service') category = 'services'
+        if (resource.type === 'database') category = 'databases'
+
+        console.log(`[v0] Stopping ${category}/${resource.uuid}`)
+        return this.request(`/api/v1/${category}/${resource.uuid}/stop`, {
+          method: 'POST'
+        })
+      })
+
+      await Promise.all(promises)
+      console.log(`[v0] Successfully stopped all resources for project ${projectUuid}`)
+      return true
     } catch (error) {
       console.error(`[v0] Error stopping project ${projectUuid}:`, error)
       return false
@@ -157,8 +188,39 @@ class CoolifyClient {
 
   async startProject(projectUuid: string): Promise<boolean> {
     try {
-      // Спробуємо спочатку як додаток
-      return await this.startApplication(projectUuid)
+      console.log(`[v0] Starting project ${projectUuid}`)
+      
+      // Крок 1: Отримуємо проект та його середовища
+      const project = await this.getProject(projectUuid)
+      if (!project || !project.environments) {
+        console.error('[v0] Project not found or no environments')
+        return false
+      }
+
+      // Крок 2: Збираємо всі ID середовищ цього проекту
+      const envIds = (project.environments as any[]).map((e: any) => e.id)
+      console.log('[v0] Environment IDs:', envIds)
+
+      // Крок 3: Отримуємо всі ресурси і фільтруємо за знайденими ID
+      const allResources = await this.getAllResources()
+      const projectResources = allResources.filter((r: any) => envIds.includes(r.environment_id))
+      console.log(`[v0] Found ${projectResources.length} resources for project`)
+
+      // Крок 4: Запускаємо кожен ресурс залежно від його типу
+      const promises = projectResources.map(async (resource: any) => {
+        let category = 'applications'
+        if (resource.type === 'service') category = 'services'
+        if (resource.type === 'database') category = 'databases'
+
+        console.log(`[v0] Starting ${category}/${resource.uuid}`)
+        return this.request(`/api/v1/${category}/${resource.uuid}/start`, {
+          method: 'POST'
+        })
+      })
+
+      await Promise.all(promises)
+      console.log(`[v0] Successfully started all resources for project ${projectUuid}`)
+      return true
     } catch (error) {
       console.error(`[v0] Error starting project ${projectUuid}:`, error)
       return false
