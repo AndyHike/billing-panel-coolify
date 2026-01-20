@@ -28,12 +28,14 @@ class CoolifyClient {
   }
 
   private async request(endpoint: string, options: RequestInit = {}) {
-    const url = `${this.baseUrl}/api/v1${endpoint}`
+    const url = `${this.baseUrl}${endpoint}`
+    
+    console.log(`[v0] Coolify API request: ${url}`)
     
     const response = await fetch(url, {
       ...options,
       headers: {
-        'Authorization': `Bearer ${this.token}`,
+        'Authorization': this.token,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         ...options.headers,
@@ -42,6 +44,7 @@ class CoolifyClient {
 
     if (!response.ok) {
       const error = await response.text()
+      console.error(`[v0] Coolify API error: ${response.status} - ${error}`)
       throw new Error(`Coolify API error: ${response.status} - ${error}`)
     }
 
@@ -70,11 +73,23 @@ class CoolifyClient {
     }
   }
 
+  // Отримати всі ресурси
+  async getAllResources(): Promise<CoolifyResource[]> {
+    try {
+      const data = await this.request('/api/v1/resources')
+      return data.data || data || []
+    } catch (error) {
+      console.error('[v0] Error fetching all resources:', error)
+      return []
+    }
+  }
+
   // Отримати всі ресурси проекту
   async getProjectResources(projectUuid: string): Promise<CoolifyResource[]> {
     try {
-      const data = await this.request(`/projects/${projectUuid}/resources`)
-      return data.data || data || []
+      // Отримуємо всі ресурси і фільтруємо по project_uuid
+      const allResources = await this.getAllResources()
+      return allResources.filter((r: any) => r.project_uuid === projectUuid)
     } catch (error) {
       console.error(`[v0] Error fetching resources for project ${projectUuid}:`, error)
       return []
@@ -119,44 +134,63 @@ class CoolifyClient {
     }
   }
 
-  // Зупинити ресурс
-  async stopResource(resourceUuid: string): Promise<boolean> {
+  // Отримати сервіс за UUID
+  async getService(serviceUuid: string): Promise<any> {
     try {
-      await this.request(`/resources/${resourceUuid}/stop`, {
+      const data = await this.request(`/api/v1/services/${serviceUuid}`)
+      return data
+    } catch (error) {
+      console.error(`[v0] Error fetching service ${serviceUuid}:`, error)
+      return null
+    }
+  }
+
+  // Зупинити сервіс
+  async stopService(serviceUuid: string): Promise<boolean> {
+    try {
+      await this.request(`/api/v1/services/${serviceUuid}/stop`, {
         method: 'POST',
       })
-      console.log(`[v0] Successfully stopped resource ${resourceUuid}`)
+      console.log(`[v0] Successfully stopped service ${serviceUuid}`)
       return true
+    } catch (error) {
+      console.error(`[v0] Error stopping service ${serviceUuid}:`, error)
+      return false
+    }
+  }
+
+  // Запустити сервіс
+  async startService(serviceUuid: string): Promise<boolean> {
+    try {
+      await this.request(`/api/v1/services/${serviceUuid}/start`, {
+        method: 'POST',
+      })
+      console.log(`[v0] Successfully started service ${serviceUuid}`)
+      return true
+    } catch (error) {
+      console.error(`[v0] Error starting service ${serviceUuid}:`, error)
+      return false
+    }
+  }
+
+  // Зупинити ресурс (універсальний метод)
+  async stopResource(resourceUuid: string): Promise<boolean> {
+    try {
+      // Спробуємо як сервіс
+      return await this.stopService(resourceUuid)
     } catch (error) {
       console.error(`[v0] Error stopping resource ${resourceUuid}:`, error)
       return false
     }
   }
 
-  // Запустити ресурс
+  // Запустити ресурс (універсальний метод)
   async startResource(resourceUuid: string): Promise<boolean> {
     try {
-      await this.request(`/resources/${resourceUuid}/start`, {
-        method: 'POST',
-      })
-      console.log(`[v0] Successfully started resource ${resourceUuid}`)
-      return true
+      // Спробуємо як сервіс
+      return await this.startService(resourceUuid)
     } catch (error) {
       console.error(`[v0] Error starting resource ${resourceUuid}:`, error)
-      return false
-    }
-  }
-
-  // Перезапустити ресурс
-  async restartResource(resourceUuid: string): Promise<boolean> {
-    try {
-      await this.request(`/resources/${resourceUuid}/restart`, {
-        method: 'POST',
-      })
-      console.log(`[v0] Successfully restarted resource ${resourceUuid}`)
-      return true
-    } catch (error) {
-      console.error(`[v0] Error restarting resource ${resourceUuid}:`, error)
       return false
     }
   }
