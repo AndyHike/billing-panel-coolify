@@ -29,7 +29,8 @@ class CoolifyClient {
   private token: string
 
   constructor(baseUrl: string, token: string) {
-    this.baseUrl = baseUrl
+    // Видаляємо косу в кінці baseUrl якщо вона є
+    this.baseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl
     this.token = token
   }
 
