@@ -6,7 +6,7 @@ const SECRET_KEY = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-secret-key-change-in-production'
 )
 
-export default async function middleware(request: NextRequest) {
+async function proxyHandler(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Публічні маршрути (логін)
@@ -42,6 +42,10 @@ export default async function middleware(request: NextRequest) {
     return response
   }
 }
+
+// Export both named and default
+export { proxyHandler as proxy }
+export default proxyHandler
 
 export const config = {
   matcher: [
