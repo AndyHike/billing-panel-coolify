@@ -1,58 +1,54 @@
-# Dockerfile для Coolify Admin Panel
-# Оптимізований для Coolify deployment
+# Dockerfile для Coolify Admin Panel на базі Debian Slim
+FROM node:20-bookworm-slim AS base
 
-FROM node:20-alpine AS base
-
-# Встановлюємо залежності для PostgreSQL
-RUN apk add --no-cache libc6-compat postgresql-client
+# Встановлюємо залежності для PostgreSQL та інструменти збірки для pg-native
+# Нам потрібні python3, build-essential та libpq-dev для node-gyp
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    build-essential \
+    python3 \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install dependencies only when needed
+# Етап встановлення залежностей
 FROM base AS deps
 WORKDIR /app
 
-# Копіюємо файли залежностей
 COPY package.json package-lock.json* ./
 
-# Встановлюємо залежності
+# Встановлюємо залежності (тепер pg-native зможе скомпілюватися)
 RUN npm install
 
-# Build the application
+# Етап збірки додатку
 FROM base AS builder
 WORKDIR /app
 
-# Копіюємо залежності з попереднього stage
 COPY --from=deps /app/node_modules ./node_modules
-
-# Копіюємо всі файли проекту
 COPY . .
 
-# Вимикаємо телеметрію Next.js під час білда
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Білдимо додаток
 RUN npm run build
 
-# Production image
+# Production образ
 FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Створюємо non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# Створюємо non-root user (синтаксис Debian відрізняється від Alpine)
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nodejs nextjs
 
-# Копіюємо публічні файли
 COPY --from=builder /app/public ./public
 
 # Створюємо .next директорію з правильними правами
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
+RUN mkdir .next && chown nextjs:nodejs .next
 
-# Копіюємо білд
+# Копіюємо білд (standalone режим Next.js)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
@@ -63,5 +59,4 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Запускаємо додаток
 CMD ["node", "server.js"]
