@@ -111,8 +111,25 @@ class CoolifyClient {
 
   async getProjectResources(projectUuid: string): Promise<CoolifyResource[]> {
     try {
+      // Отримуємо проект та його середовища
+      const project = await this.getProject(projectUuid)
+      if (!project || !project.environments) {
+        console.error(`[v0] Project or environments not found for ${projectUuid}`)
+        return []
+      }
+
+      // Збираємо всі environment IDs цього проекту
+      const envIds = (project.environments as any[]).map((env: any) => env.id)
+      console.log(`[v0] Project ${projectUuid} environment IDs:`, envIds)
+
+      // Отримуємо всі ресурси сервера
       const allResources = await this.getAllResources()
-      return allResources.filter((r: any) => r.project_uuid === projectUuid)
+      
+      // Фільтруємо ресурси за environment_id (НЕ project_uuid!)
+      const filtered = allResources.filter((r: any) => envIds.includes(r.environment_id))
+      console.log(`[v0] Found ${filtered.length} resources for project ${projectUuid}`)
+      
+      return filtered
     } catch (error) {
       console.error(`[v0] Error fetching resources for project ${projectUuid}:`, error)
       return []
@@ -149,16 +166,22 @@ class CoolifyClient {
     try {
       console.log(`[v0] Stopping project ${projectUuid}`)
       
-      const allResources = await this.getAllResources()
-      const projectResources = allResources.filter((r: any) => r.project_uuid === projectUuid)
-      console.log(`[v0] Found ${projectResources.length} resources to stop in project ${projectUuid}`)
+      // Отримуємо ресурси проекту (правильно фільтровані за environment_id)
+      const resources = await this.getProjectResources(projectUuid)
+      console.log(`[v0] Found ${resources.length} resources to stop`)
       
-      // Передаємо весь об'єкт, щоб метод stopResource знав і тип, і статус
-      const stopPromises = projectResources.map(resource => this.stopResource(resource))
+      if (resources.length === 0) {
+        console.warn(`[v0] No resources found for project ${projectUuid}`)
+        return false
+      }
+
+      // Зупиняємо всі ресурси паралельно
+      const results = await Promise.all(
+        resources.map(resource => this.stopResource(resource))
+      )
       
-      const results = await Promise.all(stopPromises)
       const success = results.every(res => res === true)
-      console.log(`[v0] Project ${projectUuid} stop result: ${success}`)
+      console.log(`[v0] Project stop completed: ${success ? 'success' : 'partial failure'}`)
       return success
     } catch (error) {
       console.error(`[v0] Error stopping project ${projectUuid}:`, error)
@@ -170,16 +193,22 @@ class CoolifyClient {
     try {
       console.log(`[v0] Starting project ${projectUuid}`)
       
-      const allResources = await this.getAllResources()
-      const projectResources = allResources.filter((r: any) => r.project_uuid === projectUuid)
-      console.log(`[v0] Found ${projectResources.length} resources to start in project ${projectUuid}`)
+      // Отримуємо ресурси проекту (правильно фільтровані за environment_id)
+      const resources = await this.getProjectResources(projectUuid)
+      console.log(`[v0] Found ${resources.length} resources to start`)
       
-      // Передаємо весь об'єкт, щоб метод startResource знав і тип, і статус
-      const startPromises = projectResources.map(resource => this.startResource(resource))
+      if (resources.length === 0) {
+        console.warn(`[v0] No resources found for project ${projectUuid}`)
+        return false
+      }
+
+      // Запускаємо всі ресурси паралельно
+      const results = await Promise.all(
+        resources.map(resource => this.startResource(resource))
+      )
       
-      const results = await Promise.all(startPromises)
       const success = results.every(res => res === true)
-      console.log(`[v0] Project ${projectUuid} start result: ${success}`)
+      console.log(`[v0] Project start completed: ${success ? 'success' : 'partial failure'}`)
       return success
     } catch (error) {
       console.error(`[v0] Error starting project ${projectUuid}:`, error)
