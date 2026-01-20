@@ -1,68 +1,64 @@
-# Dockerfile для Coolify Admin Panel
-# Оптимізований для Coolify deployment
-# Version: 1.0.1 - Fixed SSL connection issues
+# Dockerfile для Coolify (Next.js 16 + Tailwind 4)
+FROM node:20-bookworm-slim AS base
 
-FROM node:20-alpine AS base
+# Встановлюємо системні залежності
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    build-essential \
+    python3 \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
 
-# Встановлюємо залежності для PostgreSQL
-RUN apk add --no-cache libc6-compat postgresql-client
+# Встановлюємо pnpm
+RUN npm install -g pnpm
 
 WORKDIR /app
 
-# Install dependencies only when needed
+# --- Етап залежностей ---
 FROM base AS deps
 WORKDIR /app
 
-# Копіюємо файли залежностей
-COPY package.json package-lock.json* ./
+# Копіюємо файли конфігурації пакетів
+COPY package.json pnpm-lock.yaml* ./
 
-# Встановлюємо залежності
-RUN npm ci
+# Встановлюємо ВСІ залежності (включаючи devDependencies для Tailwind)
+# Використовуємо --frozen-lockfile для стабільності
+RUN pnpm install --frozen-lockfile
 
-# Build the application
+# --- Етап збірки ---
 FROM base AS builder
 WORKDIR /app
 
-# Копіюємо залежності з попереднього stage
+# Копіюємо залежності з попереднього етапу
 COPY --from=deps /app/node_modules ./node_modules
-
-# Копіюємо всі файли проекту
 COPY . .
 
-# Вимикаємо телеметрію Next.js під час білда
+# Вимикаємо телеметрію
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Білдимо додаток
-RUN npm run build
+# Запускаємо білд (тепер всі плагіни Tailwind будуть на місці)
+RUN pnpm run build
 
-# Production image
+# --- Етап Production ---
 FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Створюємо non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nodejs nextjs
 
-# Копіюємо публічні файли
 COPY --from=builder /app/public ./public
+RUN mkdir .next && chown nextjs:nodejs .next
 
-# Створюємо .next директорію з правильними правами
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-# Копіюємо білд
+# Копіюємо результати збірки (Next.js standalone)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
-
 EXPOSE 3000
-
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Запускаємо додаток
 CMD ["node", "server.js"]
