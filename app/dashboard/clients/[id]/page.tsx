@@ -33,7 +33,14 @@ async function getClient(id: string) {
   )
 
   return {
-    ...client,
+    id: client.id,
+    name: client.name,
+    email: client.email,
+    phone: client.phone,
+    company: client.company,
+    notes: client.notes,
+    createdAt: client.created_at,
+    updatedAt: client.updated_at,
     projects: projectsResult.rows,
   }
 }

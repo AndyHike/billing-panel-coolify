@@ -8,15 +8,60 @@ import { ClientsList } from '@/components/dashboard/clients-list'
 async function getClients() {
   const result = await query(`
     SELECT 
-      c.*,
-      COUNT(cp.id) as projects_count
+      c.id,
+      c.name,
+      c.email,
+      c.phone,
+      c.company,
+      c.notes,
+      c.created_at,
+      c.updated_at
     FROM clients c
-    LEFT JOIN client_projects cp ON c.id = cp.client_id
-    GROUP BY c.id
     ORDER BY c.created_at DESC
   `)
   
-  return result.rows
+  // Отримуємо проекти для кожного клієнта
+  const clientsWithProjects = await Promise.all(
+    result.rows.map(async (client) => {
+      const projectsResult = await query(
+        `SELECT 
+          cp.id,
+          cp.end_date,
+          cp.status,
+          p.id as project_id,
+          p.name as project_name,
+          p.coolify_uuid
+         FROM client_projects cp
+         JOIN projects p ON cp.project_id = p.id
+         WHERE cp.client_id = $1`,
+        [client.id]
+      )
+      
+      return {
+        id: client.id,
+        name: client.name,
+        email: client.email,
+        phone: client.phone,
+        company: client.company,
+        notes: client.notes,
+        createdAt: client.created_at,
+        updatedAt: client.updated_at,
+        projects: projectsResult.rows.map(p => ({
+          id: p.id,
+          endDate: p.end_date,
+          isActive: p.status === 'active',
+          isPaused: p.status === 'paused',
+          project: {
+            id: p.project_id,
+            name: p.project_name,
+            coolifyUuid: p.coolify_uuid,
+          }
+        }))
+      }
+    })
+  )
+  
+  return clientsWithProjects
 }
 
 export default async function ClientsPage() {

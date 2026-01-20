@@ -35,8 +35,21 @@ export function ClientsList({ clients }: ClientsListProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {clients.map((client) => {
-        const activeProjects = client.projects.filter(p => p.isActive && !p.isPaused).length
-        const pausedProjects = client.projects.filter(p => p.isPaused).length
+        const activeProjects = client.projects?.filter(p => p.isActive && !p.isPaused).length || 0
+        const pausedProjects = client.projects?.filter(p => p.isPaused).length || 0
+        
+        // Безпечна обробка дати
+        let dateText = 'недавно'
+        try {
+          if (client.createdAt) {
+            const date = new Date(client.createdAt)
+            if (!isNaN(date.getTime())) {
+              dateText = formatDistanceToNow(date, { addSuffix: true, locale: uk })
+            }
+          }
+        } catch (e) {
+          console.error('[v0] Date formatting error:', e)
+        }
         
         return (
           <Card key={client.id} className="hover:shadow-lg transition-shadow">
@@ -46,10 +59,7 @@ export function ClientsList({ clients }: ClientsListProps) {
                   <CardTitle className="text-lg">{client.name}</CardTitle>
                   <CardDescription className="flex items-center gap-1 text-xs">
                     <Calendar className="h-3 w-3" />
-                    {formatDistanceToNow(new Date(client.createdAt), { 
-                      addSuffix: true, 
-                      locale: uk 
-                    })}
+                    {dateText}
                   </CardDescription>
                 </div>
                 <div className="flex gap-1">
@@ -82,7 +92,7 @@ export function ClientsList({ clients }: ClientsListProps) {
                 )}
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <FolderGit2 className="h-4 w-4" />
-                  <span>{client.projects.length} проектів</span>
+                  <span>{client.projects?.length || 0} проектів</span>
                 </div>
               </div>
 
