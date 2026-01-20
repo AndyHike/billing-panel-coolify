@@ -3,6 +3,12 @@
 const COOLIFY_API_URL = process.env.COOLIFY_API_URL || 'http://localhost:8000'
 const COOLIFY_API_TOKEN = process.env.COOLIFY_API_TOKEN || ''
 
+// Debug logging
+console.log('[v0] Coolify configuration:')
+console.log('[v0] COOLIFY_API_URL:', COOLIFY_API_URL)
+console.log('[v0] COOLIFY_API_TOKEN exists:', !!COOLIFY_API_TOKEN)
+console.log('[v0] COOLIFY_API_TOKEN length:', COOLIFY_API_TOKEN?.length)
+
 interface CoolifyProject {
   uuid: string
   name: string
@@ -31,32 +37,49 @@ class CoolifyClient {
     const url = `${this.baseUrl}${endpoint}`
     
     console.log(`[v0] Coolify API request: ${url}`)
+    console.log(`[v0] Token length:`, this.token.length)
     
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Authorization': this.token,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...options.headers,
-      },
-    })
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000)
+    
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          'Authorization': this.token,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...options.headers,
+        },
+      })
+      
+      clearTimeout(timeoutId)
 
-    if (!response.ok) {
-      const error = await response.text()
-      console.error(`[v0] Coolify API error: ${response.status} - ${error}`)
-      throw new Error(`Coolify API error: ${response.status} - ${error}`)
+      if (!response.ok) {
+        const error = await response.text()
+        console.error(`[v0] Coolify API error: ${response.status} - ${error}`)
+        throw new Error(`Coolify API error: ${response.status} - ${error}`)
+      }
+
+      return response.json()
+    } catch (error) {
+      clearTimeout(timeoutId)
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          console.error(`[v0] Coolify API timeout after 30s: ${url}`)
+          throw new Error(`Coolify API timeout: ${url}`)
+        }
+        console.error(`[v0] Coolify API fetch error:`, error.message)
+      }
+      throw error
     }
-
-    return response.json()
   }
 
-  // Отримати всі проекти
   async getProjects(): Promise<CoolifyProject[]> {
     try {
       const data = await this.request('/api/v1/projects')
       console.log('[v0] Coolify projects response:', JSON.stringify(data))
-      // Coolify повертає масив напряму
       return Array.isArray(data) ? data : (data.data || [])
     } catch (error) {
       console.error('[v0] Error fetching Coolify projects:', error)
@@ -64,12 +87,10 @@ class CoolifyClient {
     }
   }
 
-  // Отримати проект за UUID
   async getProject(uuid: string): Promise<CoolifyProject | null> {
     try {
       const data = await this.request(`/api/v1/projects/${uuid}`)
       console.log(`[v0] Coolify project ${uuid} response:`, JSON.stringify(data))
-      // Coolify повертає об'єкт напряму
       return data || null
     } catch (error) {
       console.error(`[v0] Error fetching project ${uuid}:`, error)
@@ -77,7 +98,6 @@ class CoolifyClient {
     }
   }
 
-  // Отримати всі ресурси
   async getAllResources(): Promise<CoolifyResource[]> {
     try {
       const data = await this.request('/api/v1/resources')
@@ -88,10 +108,8 @@ class CoolifyClient {
     }
   }
 
-  // Отримати всі ресурси проекту
   async getProjectResources(projectUuid: string): Promise<CoolifyResource[]> {
     try {
-      // Отримуємо всі ресурси і фільтруємо по project_uuid
       const allResources = await this.getAllResources()
       return allResources.filter((r: any) => r.project_uuid === projectUuid)
     } catch (error) {
@@ -100,12 +118,10 @@ class CoolifyClient {
     }
   }
 
-  // Зупинити всі ресурси проекту
   async stopProject(projectUuid: string): Promise<boolean> {
     try {
       const resources = await this.getProjectResources(projectUuid)
       
-      // Зупиняємо кожен ресурс окремо
       const stopPromises = resources.map(resource => 
         this.stopResource(resource.uuid)
       )
@@ -119,12 +135,10 @@ class CoolifyClient {
     }
   }
 
-  // Запустити всі ресурси проекту
   async startProject(projectUuid: string): Promise<boolean> {
     try {
       const resources = await this.getProjectResources(projectUuid)
       
-      // Запускаємо кожен ресурс окремо
       const startPromises = resources.map(resource => 
         this.startResource(resource.uuid)
       )
@@ -138,7 +152,6 @@ class CoolifyClient {
     }
   }
 
-  // Отримати сервіс за UUID
   async getService(serviceUuid: string): Promise<any> {
     try {
       const data = await this.request(`/api/v1/services/${serviceUuid}`)
@@ -149,7 +162,6 @@ class CoolifyClient {
     }
   }
 
-  // Зупинити сервіс
   async stopService(serviceUuid: string): Promise<boolean> {
     try {
       await this.request(`/api/v1/services/${serviceUuid}/stop`, {
@@ -163,7 +175,6 @@ class CoolifyClient {
     }
   }
 
-  // Запустити сервіс
   async startService(serviceUuid: string): Promise<boolean> {
     try {
       await this.request(`/api/v1/services/${serviceUuid}/start`, {
@@ -177,10 +188,8 @@ class CoolifyClient {
     }
   }
 
-  // Зупинити ресурс (універсальний метод)
   async stopResource(resourceUuid: string): Promise<boolean> {
     try {
-      // Спробуємо як сервіс
       return await this.stopService(resourceUuid)
     } catch (error) {
       console.error(`[v0] Error stopping resource ${resourceUuid}:`, error)
@@ -188,10 +197,8 @@ class CoolifyClient {
     }
   }
 
-  // Запустити ресурс (універсальний метод)
   async startResource(resourceUuid: string): Promise<boolean> {
     try {
-      // Спробуємо як сервіс
       return await this.startService(resourceUuid)
     } catch (error) {
       console.error(`[v0] Error starting resource ${resourceUuid}:`, error)
@@ -200,7 +207,6 @@ class CoolifyClient {
   }
 }
 
-// Singleton instance
 export const coolify = new CoolifyClient(COOLIFY_API_URL, COOLIFY_API_TOKEN)
 
 export type { CoolifyProject, CoolifyResource }
