@@ -1,10 +1,10 @@
 import { Pool } from 'pg'
 
-let pool: Pool | null = null
+let poolInstance: Pool | null = null
 
 export function getDb() {
-  if (!pool) {
-    pool = new Pool({
+  if (!poolInstance) {
+    poolInstance = new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
       max: 20,
@@ -12,8 +12,11 @@ export function getDb() {
       connectionTimeoutMillis: 10000,
     })
   }
-  return pool
+  return poolInstance
 }
+
+// Export pool for compatibility
+export const pool = getDb()
 
 export async function query(text: string, params?: any[]) {
   const db = getDb()
