@@ -75,37 +75,41 @@ export function DateTimePicker({
         />
 
         {/* Вибір часу */}
-        <div className="flex gap-2">
-          <InputGroup>
-            <InputGroupAddon align="inline-start">
-              <Clock className="h-4 w-4" />
-            </InputGroupAddon>
-            <InputGroupInput
-              type="number"
-              placeholder="00"
-              value={hoursInput}
-              onChange={(e) => handleHoursChange(e.target.value)}
-              disabled={disabled}
-              min="0"
-              max="23"
-              className="text-center"
-            />
-          </InputGroup>
+        <div className="flex gap-2 items-center">
+          <div className="flex-1">
+            <InputGroup>
+              <InputGroupAddon align="inline-start">
+                <Clock className="h-4 w-4" />
+              </InputGroupAddon>
+              <InputGroupInput
+                type="number"
+                placeholder="00"
+                value={hoursInput}
+                onChange={(e) => handleHoursChange(e.target.value)}
+                disabled={disabled}
+                min="0"
+                max="23"
+                className="text-center w-12"
+              />
+            </InputGroup>
+          </div>
 
-          <div className="flex items-center text-muted-foreground text-lg font-medium">:</div>
+          <div className="text-muted-foreground text-lg font-medium">:</div>
 
-          <InputGroup className="flex-1">
-            <InputGroupInput
-              type="number"
-              placeholder="00"
-              value={minutesInput}
-              onChange={(e) => handleMinutesChange(e.target.value)}
-              disabled={disabled}
-              min="0"
-              max="59"
-              className="text-center"
-            />
-          </InputGroup>
+          <div className="flex-1">
+            <InputGroup>
+              <InputGroupInput
+                type="number"
+                placeholder="00"
+                value={minutesInput}
+                onChange={(e) => handleMinutesChange(e.target.value)}
+                disabled={disabled}
+                min="0"
+                max="59"
+                className="text-center w-12"
+              />
+            </InputGroup>
+          </div>
         </div>
       </div>
 

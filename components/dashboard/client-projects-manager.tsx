@@ -243,20 +243,6 @@ export function ClientProjectsManager({
                   Скасувати
                 </Button>
               </div>
-
-              <div className="flex gap-2">
-                <Button onClick={handleAddProject} disabled={loading === 'add'} size="sm">
-                  {loading === 'add' ? 'Додавання...' : 'Додати'}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowAddForm(false)}
-                  disabled={loading === 'add'}
-                  size="sm"
-                >
-                  Скасувати
-                </Button>
-              </div>
             </CardContent>
           </Card>
         )}
