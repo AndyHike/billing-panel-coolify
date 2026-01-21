@@ -28,3 +28,6 @@ next-env.d.ts
 
 # prisma
 prisma/migrations/
+
+# cron logs
+/logs/

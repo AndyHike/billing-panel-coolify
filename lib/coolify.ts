@@ -111,27 +111,47 @@ class CoolifyClient {
 
   async getProjectResources(projectUuid: string): Promise<CoolifyResource[]> {
     try {
+      console.log(`[v0]   Sub-Step 1a: Fetching project ${projectUuid} details...`)
+      
       // Отримуємо проект та його середовища
       const project = await this.getProject(projectUuid)
-      if (!project || !project.environments) {
-        console.error(`[v0] Project or environments not found for ${projectUuid}`)
+      if (!project) {
+        console.error(`[v0]   ❌ Project not found: ${projectUuid}`)
+        return []
+      }
+
+      console.log(`[v0]   ✅ Project found: ${project.name}`)
+      
+      if (!project.environments) {
+        console.error(`[v0]   ❌ Project has no environments field`)
         return []
       }
 
       // Збираємо всі environment IDs цього проекту
       const envIds = (project.environments as any[]).map((env: any) => env.id)
-      console.log(`[v0] Project ${projectUuid} environment IDs:`, envIds)
+      console.log(`[v0]   Sub-Step 1b: Project has ${envIds.length} environment(s):`, envIds)
 
+      console.log(`[v0]   Sub-Step 1c: Fetching all resources from server...`)
+      
       // Отримуємо всі ресурси сервера
       const allResources = await this.getAllResources()
+      console.log(`[v0]   ✅ Total resources on server: ${allResources.length}`)
       
       // Фільтруємо ресурси за environment_id (НЕ project_uuid!)
-      const filtered = allResources.filter((r: any) => envIds.includes(r.environment_id))
-      console.log(`[v0] Found ${filtered.length} resources for project ${projectUuid}`)
+      console.log(`[v0]   Sub-Step 1d: Filtering resources by environment_id...`)
+      const filtered = allResources.filter((r: any) => {
+        const matches = envIds.includes(r.environment_id)
+        if (matches) {
+          console.log(`[v0]     ✓ Matched: ${r.name} (env_id: ${r.environment_id})`)
+        }
+        return matches
+      })
+      
+      console.log(`[v0]   Sub-Step 1e: Filtering complete. Found ${filtered.length} matching resources`)
       
       return filtered
     } catch (error) {
-      console.error(`[v0] Error fetching resources for project ${projectUuid}:`, error)
+      console.error(`[v0] ❌ Error fetching resources for project ${projectUuid}:`, error)
       return []
     }
   }
@@ -164,27 +184,53 @@ class CoolifyClient {
 
   async stopProject(projectUuid: string): Promise<boolean> {
     try {
-      console.log(`[v0] Stopping project ${projectUuid}`)
+      console.log(`[v0] ========== STOP PROJECT TRACE ==========`)
+      console.log(`[v0] Project UUID: ${projectUuid}`)
+      console.log(`[v0] Step 1: Fetching project details from Coolify...`)
       
       // Отримуємо ресурси проекту (правильно фільтровані за environment_id)
       const resources = await this.getProjectResources(projectUuid)
-      console.log(`[v0] Found ${resources.length} resources to stop`)
+      
+      console.log(`[v0] Step 2: Project resources fetched`)
+      console.log(`[v0]   Total resources found: ${resources.length}`)
       
       if (resources.length === 0) {
-        console.warn(`[v0] No resources found for project ${projectUuid}`)
+        console.warn(`[v0] ⚠️  No resources found for project ${projectUuid}`)
         return false
       }
 
+      // Виводимо інформацію про кожен ресурс
+      console.log(`[v0] Step 3: Resource details:`)
+      resources.forEach((res: any, idx: number) => {
+        console.log(`[v0]   ${idx + 1}. ${res.name}`)
+        console.log(`[v0]      UUID: ${res.uuid}`)
+        console.log(`[v0]      Type: ${res.type}`)
+        console.log(`[v0]      Status: ${res.status}`)
+        console.log(`[v0]      Environment ID: ${res.environment_id}`)
+      })
+
+      console.log(`[v0] Step 4: Stopping ${resources.length} resources in parallel...`)
+      
       // Зупиняємо всі ресурси паралельно
       const results = await Promise.all(
-        resources.map(resource => this.stopResource(resource))
+        resources.map((resource: any, idx: number) => {
+          console.log(`[v0]   Starting stop for resource ${idx + 1}/${resources.length}: ${resource.name}`)
+          return this.stopResource(resource)
+        })
       )
       
+      const successCount = results.filter(r => r === true).length
       const success = results.every(res => res === true)
-      console.log(`[v0] Project stop completed: ${success ? 'success' : 'partial failure'}`)
+      
+      console.log(`[v0] Step 5: Results:`)
+      console.log(`[v0]   Successful: ${successCount}/${resources.length}`)
+      console.log(`[v0]   Failed: ${results.length - successCount}/${resources.length}`)
+      console.log(`[v0] Project stop completed: ${success ? '✅ SUCCESS' : '❌ PARTIAL FAILURE'}`)
+      console.log(`[v0] ========================================\n`)
+      
       return success
     } catch (error) {
-      console.error(`[v0] Error stopping project ${projectUuid}:`, error)
+      console.error(`[v0] ❌ Fatal error stopping project ${projectUuid}:`, error)
       return false
     }
   }
@@ -254,9 +300,15 @@ class CoolifyClient {
 
   async stopResource(resource: any): Promise<boolean> {
     try {
+      console.log(`[v0]   Resource Stop:`)
+      console.log(`[v0]     Name: ${resource.name}`)
+      console.log(`[v0]     UUID: ${resource.uuid}`)
+      console.log(`[v0]     Type: ${resource.type}`)
+      console.log(`[v0]     Current Status: ${resource.status}`)
+      
       // 1. Перевіряємо, чи ресурс уже зупинений
       if (resource.status && resource.status.toLowerCase().includes('exited')) {
-        console.log(`[v0] ${resource.name} is already stopped (Status: ${resource.status})`)
+        console.log(`[v0]     ℹ️  Already stopped (status: ${resource.status})`)
         return true
       }
 
@@ -271,12 +323,13 @@ class CoolifyClient {
       }
 
       const endpoint = `/api/v1/${category}/${resource.uuid}/stop`
-      console.log(`[v0] Stopping ${category}/${resource.uuid} (${resource.name})`)
+      console.log(`[v0]     Calling: ${category}/${resource.uuid}/stop`)
 
       await this.request(endpoint, { method: 'POST' })
+      console.log(`[v0]     ✅ Stop successful`)
       return true
     } catch (error) {
-      console.error(`[v0] Error stopping resource ${resource.name}:`, error)
+      console.error(`[v0]     ❌ Stop failed:`, error instanceof Error ? error.message : error)
       return false
     }
   }
