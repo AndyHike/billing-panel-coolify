@@ -18,6 +18,7 @@ WORKDIR /app
 FROM base AS deps
 WORKDIR /app
 COPY package.json pnpm-lock.yaml* ./
+# Встановлюємо всі залежності (вони знадобляться для крона)
 RUN pnpm install --frozen-lockfile
 
 # --- Етап збірки ---
@@ -25,11 +26,9 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
 ENV NEXT_TELEMETRY_DISABLED=1
-# Додаємо тимчасову адресу для білду, щоб уникнути помилок валідації
+# Заглушка для білду
 ENV DATABASE_URL=postgresql://placeholder:5432/db
-
 RUN pnpm run build
 
 # --- Етап Production ---
@@ -42,15 +41,20 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 --gid nodejs nextjs
 
-COPY --from=builder /app/public ./public
-# Створюємо необхідні папки та налаштовуємо права
-RUN mkdir .next logs && chown nextjs:nodejs .next logs
+# Створюємо папки для логів та статики
+RUN mkdir -p logs .next && chown -R nextjs:nodejs logs .next
 
-# Копіюємо результати збірки (standalone mode)
+COPY --from=builder /app/public ./public
+
+# 1. Копіюємо результати збірки (standalone)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# !!! ВАЖЛИВО: Копіюємо папку lib, щоб скрипт cron.js був доступний всередині !!!
+# 2. КРИТИЧНО: Копіюємо ПОВНУ папку node_modules з етапу deps.
+# Це виправить помилку "Cannot find module 'node-cron'"
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+
+# 3. Копіюємо папку lib зі скриптом крона
 COPY --from=builder --chown=nextjs:nodejs /app/lib ./lib
 
 USER nextjs
