@@ -34,7 +34,6 @@ export function DashboardNav({ user }: DashboardNavProps) {
     { href: '/dashboard', label: 'Головна', icon: Home },
     { href: '/dashboard/clients', label: 'Клієнти', icon: Users },
     { href: '/dashboard/projects', label: 'Проекти', icon: FolderGit2 },
-    { href: '/dashboard/database', label: 'БД', icon: Database },
   ]
 
   return (

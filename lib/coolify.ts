@@ -392,6 +392,66 @@ class CoolifyClient {
       return null
     }
   }
+
+  // Отримати список бекапів БД
+  async getDatabaseBackups(databaseUuid: string): Promise<any[]> {
+    try {
+      console.log(`[v0] Fetching backups for database ${databaseUuid}`)
+      const data = await this.request(`/api/v1/databases/${databaseUuid}/backups`)
+      return data || []
+    } catch (error) {
+      console.error(`[v0] Error fetching backups:`, error)
+      return []
+    }
+  }
+
+  // Запросити новий бекап БД
+  async createDatabaseBackup(databaseUuid: string): Promise<boolean> {
+    try {
+      console.log(`[v0] Creating backup for database ${databaseUuid}`)
+      await this.request(`/api/v1/databases/${databaseUuid}/backups`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          frequency: 'manual',
+          enabled: true,
+          save_s3: false,
+          backup_now: true,
+          database_backup_retention_amount_locally: 5,
+          database_backup_retention_days_locally: 7,
+        }),
+      })
+      console.log(`[v0] Backup requested successfully`)
+      return true
+    } catch (error) {
+      console.error(`[v0] Error creating backup:`, error)
+      return false
+    }
+  }
+
+  // Отримати файл бекапу для завантаження
+  async getDatabaseBackupFile(databaseUuid: string, backupFilename: string): Promise<Blob | null> {
+    try {
+      console.log(`[v0] Downloading backup: ${backupFilename}`)
+      const response = await fetch(
+        `${this.baseUrl}/api/v1/databases/${databaseUuid}/backups/${backupFilename}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${this.apiToken}`,
+          },
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      return await response.blob()
+    } catch (error) {
+      console.error(`[v0] Error downloading backup:`, error)
+      return null
+    }
+  }
 }
 
 export const coolify = new CoolifyClient(COOLIFY_API_URL, COOLIFY_API_TOKEN)
