@@ -5,7 +5,7 @@ import { getCurrentUser } from '@/lib/auth'
 // Оновлення клієнта
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getCurrentUser()
@@ -13,6 +13,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     const body = await request.json()
     const { name, email, phone, company, notes } = body
 
@@ -28,7 +29,7 @@ export async function PUT(
        SET name = $1, email = $2, phone = $3, company = $4, notes = $5, updated_at = NOW()
        WHERE id = $6
        RETURNING *`,
-      [name, email || null, phone || null, company || null, notes || null, params.id]
+      [name, email || null, phone || null, company || null, notes || null, id]
     )
 
     if (result.rows.length === 0) {
@@ -51,7 +52,7 @@ export async function PUT(
 // Отримання клієнта
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getCurrentUser()
@@ -59,9 +60,11 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
+
     const result = await query(
       'SELECT * FROM clients WHERE id = $1',
-      [params.id]
+      [id]
     )
 
     if (result.rows.length === 0) {

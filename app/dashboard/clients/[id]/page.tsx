@@ -96,7 +96,7 @@ export default async function ClientDetailPage({
                 <CardTitle>Інформація про клієнта</CardTitle>
                 <CardDescription>Основні дані</CardDescription>
               </div>
-              <Link href={`/dashboard/clients/${client.id}/edit?client=${encodeURIComponent(JSON.stringify(client))}`}>
+              <Link href={`/dashboard/clients/${client.id}/edit`}>
                 <Button variant="outline" size="sm">
                   <Edit2 className="h-4 w-4" />
                 </Button>
