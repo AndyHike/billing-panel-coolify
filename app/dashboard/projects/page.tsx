@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import { RefreshCw, FolderGit2, Users, CheckCircle, AlertCircle } from 'lucide-react'
 import { syncProjectsAction } from '@/app/actions/sync-projects'
+import { ProjectResourcesPanel } from '@/components/dashboard/project-resources-panel'
 
 interface Project {
   id: string
@@ -176,6 +177,13 @@ export default function ProjectsPage() {
                       {project.active_count} активних
                     </Badge>
                   )}
+                </div>
+                
+                <div className="border-t pt-3">
+                  <ProjectResourcesPanel 
+                    projectUuid={project.coolify_uuid}
+                    projectName={project.name}
+                  />
                 </div>
               </CardContent>
             </Card>
