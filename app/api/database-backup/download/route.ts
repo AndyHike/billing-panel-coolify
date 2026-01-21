@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { coolify } from '@/lib/coolify'
 
-// GET /api/database-backup/download - завантажити бекап
+// GET /api/database-backup/download - завантажити останній бекап
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser()
@@ -11,17 +11,16 @@ export async function GET(request: NextRequest) {
     }
 
     const databaseUuid = request.nextUrl.searchParams.get('database')
-    const filename = request.nextUrl.searchParams.get('filename')
 
-    if (!databaseUuid || !filename) {
+    if (!databaseUuid) {
       return NextResponse.json(
-        { error: 'Missing database UUID or filename' },
+        { error: 'Missing database UUID' },
         { status: 400 }
       )
     }
 
-    console.log(`[v0] Downloading backup: ${filename}`)
-    const fileBlob = await coolify.getDatabaseBackupFile(databaseUuid, filename)
+    console.log(`[v0] Downloading latest backup for database: ${databaseUuid}`)
+    const fileBlob = await coolify.getLatestDatabaseBackup(databaseUuid)
 
     if (!fileBlob) {
       return NextResponse.json(
@@ -33,7 +32,7 @@ export async function GET(request: NextRequest) {
     return new NextResponse(fileBlob, {
       headers: {
         'Content-Type': 'application/gzip',
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Disposition': `attachment; filename="backup-${new Date().getTime()}.sql.gz"`,
       },
     })
   } catch (error) {

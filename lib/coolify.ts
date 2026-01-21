@@ -393,19 +393,7 @@ class CoolifyClient {
     }
   }
 
-  // Отримати список бекапів БД
-  async getDatabaseBackups(databaseUuid: string): Promise<any[]> {
-    try {
-      console.log(`[v0] Fetching backups for database ${databaseUuid}`)
-      const data = await this.request(`/api/v1/databases/${databaseUuid}/backups`)
-      return data || []
-    } catch (error) {
-      console.error(`[v0] Error fetching backups:`, error)
-      return []
-    }
-  }
-
-  // Запросити новий бекап БД
+  // Запросити новий бекап БД (тільки backup_now: true)
   async createDatabaseBackup(databaseUuid: string): Promise<boolean> {
     try {
       console.log(`[v0] Creating backup for database ${databaseUuid}`)
@@ -413,12 +401,7 @@ class CoolifyClient {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          frequency: 'manual',
-          enabled: true,
-          save_s3: false,
           backup_now: true,
-          database_backup_retention_amount_locally: 5,
-          database_backup_retention_days_locally: 7,
         }),
       })
       console.log(`[v0] Backup requested successfully`)
@@ -429,15 +412,15 @@ class CoolifyClient {
     }
   }
 
-  // Отримати файл бекапу для завантаження
-  async getDatabaseBackupFile(databaseUuid: string, backupFilename: string): Promise<Blob | null> {
+  // Отримати дані останнього бекапу для завантаження
+  async getLatestDatabaseBackup(databaseUuid: string): Promise<Blob | null> {
     try {
-      console.log(`[v0] Downloading backup: ${backupFilename}`)
+      console.log(`[v0] Downloading latest backup for database ${databaseUuid}`)
       const response = await fetch(
-        `${this.baseUrl}/api/v1/databases/${databaseUuid}/backups/${backupFilename}`,
+        `${this.baseUrl}/api/v1/databases/${databaseUuid}/backups/latest`,
         {
           headers: {
-            'Authorization': `Bearer ${this.apiToken}`,
+            'Authorization': `Bearer ${this.token}`,
           },
         }
       )

@@ -7,9 +7,8 @@ import {
   Database,
   Loader2,
   Download,
-  Plus,
   RefreshCw,
-  ExternalLink,
+  Plus
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -47,10 +46,10 @@ function ResourceDetailsModal({ resource, projectUuid, open, onOpenChange }: Res
   const [details, setDetails] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [creatingBackup, setCreatingBackup] = useState(false)
   const [backups, setBackups] = useState<any[]>([])
   const [backupsLoading, setBackupsLoading] = useState(false)
   const [showBackups, setShowBackups] = useState(false)
-  const [creatingBackup, setCreatingBackup] = useState(false)
 
   const isDatabase =
     resource.type.toLowerCase().includes('database') ||
@@ -83,18 +82,65 @@ function ResourceDetailsModal({ resource, projectUuid, open, onOpenChange }: Res
     loadDetails()
   }
 
+  async function createAndDownloadBackup() {
+    setCreatingBackup(true)
+    setError('')
+    try {
+      // Запрошуємо новий бекап
+      const response = await fetch('/api/database-backup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ databaseUuid: resource.uuid }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Помилка створення бекапу')
+      }
+
+      console.log('[v0] Backup created, waiting 2 seconds before download...')
+      
+      // Чекаємо 2 секунди щоб бекап був готовий
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      // Завантажуємо останній бекап
+      const downloadResponse = await fetch(
+        `/api/database-backup/download?database=${resource.uuid}`
+      )
+
+      if (!downloadResponse.ok) {
+        throw new Error('Помилка завантаження бекапу')
+      }
+
+      const blob = await downloadResponse.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `backup-${resource.name}-${new Date().getTime()}.sql`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (err) {
+      console.error('[v0] Backup error:', err)
+      setError(err instanceof Error ? err.message : 'Помилка створення бекапу')
+    } finally {
+      setCreatingBackup(false)
+    }
+  }
+
   async function loadBackups() {
     setBackupsLoading(true)
+    setError('')
     try {
-      const response = await fetch(
-        `/api/database-backup?database=${resource.uuid}`
-      )
-      if (response.ok) {
-        const data = await response.json()
-        setBackups(data.backups || [])
+      const response = await fetch(`/api/database-backup?database=${resource.uuid}`)
+      if (!response.ok) {
+        throw new Error('Помилка отримання бекапів')
       }
+      const data = await response.json()
+      setBackups(data)
     } catch (err) {
-      console.error('[v0] Error loading backups:', err)
+      setError(err instanceof Error ? err.message : 'Помилка')
     } finally {
       setBackupsLoading(false)
     }
@@ -102,6 +148,7 @@ function ResourceDetailsModal({ resource, projectUuid, open, onOpenChange }: Res
 
   async function createBackup() {
     setCreatingBackup(true)
+    setError('')
     try {
       const response = await fetch('/api/database-backup', {
         method: 'POST',
@@ -109,44 +156,41 @@ function ResourceDetailsModal({ resource, projectUuid, open, onOpenChange }: Res
         body: JSON.stringify({ databaseUuid: resource.uuid }),
       })
 
-      if (response.ok) {
-        const result = await response.json()
-        console.log('[v0] Backup created:', result)
-        // Перезавантажимо список бекапів
-        await loadBackups()
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Помилка створення бекапу')
       }
+
+      console.log('[v0] Backup created, waiting 2 seconds before refresh...')
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      loadBackups()
     } catch (err) {
-      console.error('[v0] Error creating backup:', err)
+      console.error('[v0] Backup error:', err)
+      setError(err instanceof Error ? err.message : 'Помилка створення бекапу')
     } finally {
       setCreatingBackup(false)
     }
   }
 
-  async function downloadBackup(backupData: any) {
+  async function downloadBackup(backup: any) {
     try {
-      const filename = backupData.name || backupData.filename
-      console.log('[v0] Downloading backup:', filename)
-
-      const response = await fetch(
-        `/api/database-backup/download?database=${resource.uuid}&filename=${encodeURIComponent(filename)}`
-      )
-
+      const response = await fetch(`/api/database-backup/download?backup=${backup.uuid}`)
       if (!response.ok) {
-        throw new Error('Помилка завантаження')
+        throw new Error('Помилка завантаження бекапу')
       }
 
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = filename
+      a.download = backup.name || backup.filename
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
     } catch (err) {
-      console.error('[v0] Download error:', err)
-      alert('Помилка завантаження бекапу')
+      console.error('[v0] Backup download error:', err)
+      setError(err instanceof Error ? err.message : 'Помилка')
     }
   }
 
@@ -211,86 +255,25 @@ function ResourceDetailsModal({ resource, projectUuid, open, onOpenChange }: Res
             </div>
 
             {isDatabase && (
-              <div className="border-t pt-3 space-y-2">
+              <div className="border-t pt-3">
                 <Button
-                  className="w-full bg-transparent"
+                  className="w-full"
                   size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    if (!showBackups) {
-                      loadBackups()
-                    }
-                    setShowBackups(!showBackups)
-                  }}
+                  disabled={creatingBackup}
+                  onClick={createAndDownloadBackup}
                 >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Бекапи ({backups.length})
+                  {creatingBackup ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Бекап та завантаження...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 mr-2" />
+                      Бекап та завантажити
+                    </>
+                  )}
                 </Button>
-
-                {showBackups && (
-                  <div className="border rounded-lg p-2 space-y-2 bg-muted">
-                    <Button
-                      className="w-full"
-                      size="sm"
-                      disabled={creatingBackup || backupsLoading}
-                      onClick={createBackup}
-                    >
-                      {creatingBackup ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Створення...
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Новий бекап
-                        </>
-                      )}
-                    </Button>
-
-                    {backupsLoading && (
-                      <div className="flex items-center justify-center py-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      </div>
-                    )}
-
-                    {backups.length > 0 && (
-                      <div className="space-y-1 max-h-64 overflow-y-auto">
-                        {backups.map((backup, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between gap-2 p-2 bg-background rounded text-xs"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <p className="font-mono truncate">
-                                {backup.name || backup.filename}
-                              </p>
-                              {backup.size && (
-                                <p className="text-muted-foreground">
-                                  {(backup.size / 1024 / 1024).toFixed(2)} MB
-                                </p>
-                              )}
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-6 w-6 p-0"
-                              onClick={() => downloadBackup(backup)}
-                            >
-                              <Download className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {!backupsLoading && backups.length === 0 && (
-                      <p className="text-xs text-muted-foreground text-center py-2">
-                        Немає бекапів
-                      </p>
-                    )}
-                  </div>
-                )}
               </div>
             )}
           </div>
