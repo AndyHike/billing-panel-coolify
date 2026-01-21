@@ -2,7 +2,7 @@ import { query } from '@/lib/db'
 import { notFound } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ArrowLeft, Mail, Phone, Calendar } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, Calendar, Edit2 } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { uk } from 'date-fns/locale'
@@ -91,8 +91,17 @@ export default async function ClientDetailPage({
         {/* Інформація про клієнта */}
         <Card className="md:col-span-1">
           <CardHeader>
-            <CardTitle>Інформація про клієнта</CardTitle>
-            <CardDescription>Основні дані</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Інформація про клієнта</CardTitle>
+                <CardDescription>Основні дані</CardDescription>
+              </div>
+              <Link href={`/dashboard/clients/${client.id}/edit?client=${encodeURIComponent(JSON.stringify(client))}`}>
+                <Button variant="outline" size="sm">
+                  <Edit2 className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
