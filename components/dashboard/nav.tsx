@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Home, Users, FolderGit2, LogOut, User } from 'lucide-react'
+import { Home, Users, FolderGit2, LogOut, User, Database } from 'lucide-react'
 
 interface DashboardNavProps {
   user: {
@@ -34,6 +34,7 @@ export function DashboardNav({ user }: DashboardNavProps) {
     { href: '/dashboard', label: 'Головна', icon: Home },
     { href: '/dashboard/clients', label: 'Клієнти', icon: Users },
     { href: '/dashboard/projects', label: 'Проекти', icon: FolderGit2 },
+    { href: '/dashboard/database', label: 'БД', icon: Database },
   ]
 
   return (
