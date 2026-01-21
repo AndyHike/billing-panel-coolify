@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
+import { coolify } from '@/lib/coolify'
+import { queryResourceDatabase } from '@/lib/db-dynamic'
 
 // GET /api/database/[table]/data - отримати дані таблиці
 export async function GET(
@@ -18,10 +20,92 @@ export async function GET(
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = (page - 1) * limit
+    const projectUuid = searchParams.get('project')
+    const resourceUuid = searchParams.get('resource')
 
     console.log(`[v0] Fetching data from table: ${table} (page: ${page}, limit: ${limit})`)
+    if (projectUuid && resourceUuid) {
+      console.log(`[v0] Project: ${projectUuid}, Resource: ${resourceUuid}`)
+    }
 
-    // Перевіряємо, що таблиця існує
+    // Якщо це запит для проектної БД
+    if (projectUuid && resourceUuid) {
+      const resourceDetails = await coolify.getResourceDetails(resourceUuid)
+      if (!resourceDetails) {
+        return NextResponse.json(
+          { error: 'Ресурс не знайдено' },
+          { status: 404 }
+        )
+      }
+
+      console.log('[v0] Resource found, connecting to resource database...')
+
+      try {
+        // Перевіряємо чи таблиця існує в БД ресурсу
+        const tableExists = await queryResourceDatabase(
+          resourceUuid,
+          resourceDetails,
+          `
+          SELECT EXISTS(
+            SELECT 1 FROM information_schema.tables 
+            WHERE table_name = $1 AND table_schema NOT IN ('pg_catalog', 'information_schema')
+          )
+        `,
+          [table]
+        )
+
+        if (!tableExists.rows[0].exists) {
+          return NextResponse.json(
+            { error: 'Таблиця не знайдена' },
+            { status: 404 }
+          )
+        }
+
+        // Отримуємо загальну кількість рядків
+        const countResult = await queryResourceDatabase(
+          resourceUuid,
+          resourceDetails,
+          `SELECT COUNT(*) as total FROM "${table}"`
+        )
+        const total = parseInt(countResult.rows[0].total)
+
+        // Отримуємо дані таблиці
+        const dataResult = await queryResourceDatabase(
+          resourceUuid,
+          resourceDetails,
+          `SELECT * FROM "${table}" ORDER BY id DESC LIMIT $1 OFFSET $2`,
+          [limit, offset]
+        )
+
+        const totalPages = Math.ceil(total / limit)
+
+        console.log(`[v0] Found ${dataResult.rows.length} rows in resource database`)
+
+        return NextResponse.json({
+          success: true,
+          resourceName: resourceDetails.name,
+          table,
+          data: dataResult.rows,
+          pagination: {
+            page,
+            limit,
+            pages: totalPages,
+            total,
+          },
+        })
+      } catch (dbError) {
+        console.error('[v0] Error querying resource database:', dbError)
+        return NextResponse.json(
+          {
+            error: 'Помилка отримання даних',
+            details: dbError instanceof Error ? dbError.message : String(dbError),
+          },
+          { status: 500 }
+        )
+      }
+    }
+
+    // Запит до основної БД
     const tableExists = await query(`
       SELECT EXISTS(
         SELECT 1 FROM information_schema.tables 
@@ -47,7 +131,6 @@ export async function GET(
       `SELECT * FROM "${table}" ORDER BY id DESC LIMIT $1 OFFSET $2`,
       [limit, offset]
     )
-
     console.log(`[v0] Fetched ${dataResult.rows.length} rows from ${table} (total: ${total})`)
 
     return NextResponse.json({

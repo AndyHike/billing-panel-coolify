@@ -1,8 +1,10 @@
 'use client'
 
-import { Table } from "@/components/ui/table"
+import { useEffect } from "react"
 
-import { useState, useEffect } from 'react'
+import { useState } from "react"
+
+import { Table } from "@/components/ui/table"
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -88,12 +90,19 @@ export function DatabaseBrowser({ projectUuid, resourceUuid }: DatabaseBrowserPr
       try {
         setLoading(true)
         setError(null)
-        const res = await fetch('/api/database/tables')
+        
+        // Будуємо URL з параметрами якщо це проектна БД
+        let url = '/api/database/tables'
+        if (projectUuid && resourceUuid) {
+          url += `?project=${projectUuid}&resource=${resourceUuid}`
+        }
+        
+        const res = await fetch(url)
         const data = await res.json()
         if (data.success) {
           setTables(data.tables)
         } else {
-          setError('Помилка завантаження таблиць')
+          setError(data.details || 'Помилка завантаження таблиць')
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Невідома помилка')
@@ -103,20 +112,26 @@ export function DatabaseBrowser({ projectUuid, resourceUuid }: DatabaseBrowserPr
     }
 
     fetchTables()
-  }, [])
+  }, [projectUuid, resourceUuid])
 
   // Завантажити схему таблиці
   const loadTableSchema = async (tableName: string) => {
     try {
       setLoading(true)
       setError(null)
-      const res = await fetch(`/api/database/${tableName}/schema`)
+      
+      // Додаємо параметри для проектної БД
+      let url = `/api/database/${tableName}/schema`
+      if (projectUuid && resourceUuid) {
+        url += `?project=${projectUuid}&resource=${resourceUuid}`
+      }
+      
+      const res = await fetch(url)
       const data = await res.json()
       if (data.success) {
         setColumns(data.columns)
-        setSelectedTable(tableName)
-        setPage(1)
-        loadTableData(tableName, 1)
+      } else {
+        setError('Помилка завантаження схеми таблиці')
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Невідома помилка')
@@ -130,7 +145,14 @@ export function DatabaseBrowser({ projectUuid, resourceUuid }: DatabaseBrowserPr
     try {
       setLoading(true)
       setError(null)
-      const res = await fetch(`/api/database/${tableName}/data?page=${pageNum}&limit=50`)
+      
+      // Додаємо параметри для проектної БД
+      let url = `/api/database/${tableName}/data?page=${pageNum}&limit=50`
+      if (projectUuid && resourceUuid) {
+        url += `&project=${projectUuid}&resource=${resourceUuid}`
+      }
+      
+      const res = await fetch(url)
       const data = await res.json()
       if (data.success) {
         setTableData(data.data)
@@ -160,7 +182,12 @@ export function DatabaseBrowser({ projectUuid, resourceUuid }: DatabaseBrowserPr
   const handleDeleteRow = async (rowId: string) => {
     if (!confirm('Ви впевнені що хочете видалити цей рядок?')) return
     try {
-      const res = await fetch(`/api/database/${selectedTable}/data/${rowId}`, {
+      let url = `/api/database/${selectedTable}/data/${rowId}`
+      if (projectUuid && resourceUuid) {
+        url += `?project=${projectUuid}&resource=${resourceUuid}`
+      }
+      
+      const res = await fetch(url, {
         method: 'DELETE',
       })
       const data = await res.json()
@@ -181,7 +208,12 @@ export function DatabaseBrowser({ projectUuid, resourceUuid }: DatabaseBrowserPr
 
   const handleSaveRow = async () => {
     try {
-      const res = await fetch(`/api/database/${selectedTable}/data/${editingRow}`, {
+      let url = `/api/database/${selectedTable}/data/${editingRow}`
+      if (projectUuid && resourceUuid) {
+        url += `?project=${projectUuid}&resource=${resourceUuid}`
+      }
+      
+      const res = await fetch(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editData),
@@ -200,7 +232,12 @@ export function DatabaseBrowser({ projectUuid, resourceUuid }: DatabaseBrowserPr
 
   const handleAddNewRow = async () => {
     try {
-      const res = await fetch(`/api/database/${selectedTable}/data`, {
+      let url = `/api/database/${selectedTable}/data`
+      if (projectUuid && resourceUuid) {
+        url += `?project=${projectUuid}&resource=${resourceUuid}`
+      }
+      
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newRowData),
