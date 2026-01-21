@@ -40,7 +40,12 @@ interface Column {
   is_nullable: string
 }
 
-export function DatabaseBrowser() {
+interface DatabaseBrowserProps {
+  projectUuid?: string | null
+  resourceUuid?: string | null
+}
+
+export function DatabaseBrowser({ projectUuid, resourceUuid }: DatabaseBrowserProps = {}) {
   const [tables, setTables] = useState<Table[]>([])
   const [selectedTable, setSelectedTable] = useState<string | null>(null)
   const [columns, setColumns] = useState<Column[]>([])
@@ -54,6 +59,28 @@ export function DatabaseBrowser() {
   const [editingRow, setEditingRow] = useState<string | null>(null)
   const [editData, setEditData] = useState<Record<string, any>>({})
   const [newRowData, setNewRowData] = useState<Record<string, any>>({})
+  const [resourceDetails, setResourceDetails] = useState<any>(null)
+
+  // Завантажити деталі ресурсу якщо це проектна БД
+  useEffect(() => {
+    if (projectUuid && resourceUuid) {
+      const loadResourceDetails = async () => {
+        try {
+          const response = await fetch(
+            `/api/projects/${projectUuid}/resources/${resourceUuid}`
+          )
+          if (response.ok) {
+            const data = await response.json()
+            setResourceDetails(data)
+            console.log('[v0] Resource details loaded:', data)
+          }
+        } catch (err) {
+          console.error('[v0] Error loading resource details:', err)
+        }
+      }
+      loadResourceDetails()
+    }
+  }, [projectUuid, resourceUuid])
 
   // Завантажити список таблиць
   useEffect(() => {
@@ -199,7 +226,20 @@ export function DatabaseBrowser() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Database className="h-5 w-5" />
-            <CardTitle>База Даних</CardTitle>
+            <CardTitle>
+              {projectUuid && resourceDetails ? (
+                <>
+                  {resourceDetails.name || 'База Даних'}
+                  {resourceDetails.database_name && (
+                    <span className="text-sm font-normal text-muted-foreground ml-2">
+                      ({resourceDetails.database_name})
+                    </span>
+                  )}
+                </>
+              ) : (
+                'База Даних'
+              )}
+            </CardTitle>
             {tables.length > 0 && (
               <Badge variant="secondary">{tables.length} таблиць</Badge>
             )}

@@ -362,6 +362,36 @@ class CoolifyClient {
       return false
     }
   }
+
+  async getResourceDetails(resourceUuid: string): Promise<any> {
+    try {
+      console.log(`[v0] Fetching resource details for ${resourceUuid}`)
+      
+      // Спробуємо отримати дані як application
+      try {
+        const data = await this.request(`/api/v1/applications/${resourceUuid}`)
+        return data
+      } catch (appError) {
+        // Якщо не application, спробуємо як database
+        try {
+          const data = await this.request(`/api/v1/databases/${resourceUuid}`)
+          return data
+        } catch (dbError) {
+          // Якщо не database, спробуємо як service
+          try {
+            const data = await this.request(`/api/v1/services/${resourceUuid}`)
+            return data
+          } catch (serviceError) {
+            console.error(`[v0] Could not fetch resource as application, database, or service`)
+            throw new Error('Resource not found')
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`[v0] Error fetching resource details ${resourceUuid}:`, error)
+      return null
+    }
+  }
 }
 
 export const coolify = new CoolifyClient(COOLIFY_API_URL, COOLIFY_API_TOKEN)

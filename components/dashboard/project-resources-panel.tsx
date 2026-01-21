@@ -1,10 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, Server, Database, Loader2 } from 'lucide-react'
+import { ChevronDown, Server, Database, Loader2, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import Link from 'next/link'
 
 interface Resource {
   uuid: string
@@ -19,11 +27,127 @@ interface ProjectResourcesPanelProps {
   projectName: string
 }
 
+interface ResourceDetailsModalProps {
+  resource: Resource
+  projectUuid: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}
+
+function ResourceDetailsModal({ resource, projectUuid, open, onOpenChange }: ResourceDetailsModalProps) {
+  const [details, setDetails] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const isDatabase = resource.type.toLowerCase().includes('database') || 
+                    resource.type.toLowerCase().includes('postgresql')
+
+  async function loadDetails() {
+    if (!open || details) return
+    
+    setLoading(true)
+    setError('')
+    
+    try {
+      const response = await fetch(
+        `/api/projects/${projectUuid}/resources/${resource.uuid}`
+      )
+      if (!response.ok) {
+        throw new Error('Помилка отримання деталей')
+      }
+      const data = await response.json()
+      setDetails(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Помилка')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Завантажуємо деталі коли модальне вікно відкривається
+  if (open && !details && !loading && !error) {
+    loadDetails()
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {isDatabase ? (
+              <Database className="h-5 w-5" />
+            ) : (
+              <Server className="h-5 w-5" />
+            )}
+            {resource.name}
+          </DialogTitle>
+          <DialogDescription>
+            {resource.type}
+          </DialogDescription>
+        </DialogHeader>
+
+        {loading && (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+        )}
+
+        {error && (
+          <div className="text-sm text-destructive">{error}</div>
+        )}
+
+        {details && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="text-muted-foreground">Статус:</div>
+              <Badge variant="outline">{resource.status}</Badge>
+              
+              {details.database_name && (
+                <>
+                  <div className="text-muted-foreground">БД:</div>
+                  <div className="font-mono text-xs">{details.database_name}</div>
+                </>
+              )}
+              
+              {details.postgres_user && (
+                <>
+                  <div className="text-muted-foreground">Користувач:</div>
+                  <div className="font-mono text-xs">{details.postgres_user}</div>
+                </>
+              )}
+              
+              {details.postgres_password && (
+                <>
+                  <div className="text-muted-foreground">Пароль:</div>
+                  <div className="font-mono text-xs break-all">••••••••</div>
+                </>
+              )}
+            </div>
+
+            {isDatabase && (
+              <div className="border-t pt-3">
+                <Link href={`/dashboard/database?resource=${resource.uuid}&project=${projectUuid}`}>
+                  <Button className="w-full" size="sm">
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Відкрити браузер БД
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export function ProjectResourcesPanel({ projectUuid, projectName }: ProjectResourcesPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [resources, setResources] = useState<Resource[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [selectedResource, setSelectedResource] = useState<Resource | null>(null)
+  const [showModal, setShowModal] = useState(false)
 
   async function loadResources() {
     if (isExpanded) {
@@ -102,7 +226,14 @@ export function ProjectResourcesPanel({ projectUuid, projectName }: ProjectResou
             <p className="text-sm text-muted-foreground">Немає ресурсів</p>
           ) : (
             resources.map((resource) => (
-              <Card key={resource.uuid} className="hover:shadow-md transition-shadow">
+              <Card 
+                key={resource.uuid} 
+                className="hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => {
+                  setSelectedResource(resource)
+                  setShowModal(true)
+                }}
+              >
                 <CardContent className="pt-4">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -121,6 +252,15 @@ export function ProjectResourcesPanel({ projectUuid, projectName }: ProjectResou
             ))
           )}
         </div>
+      )}
+
+      {selectedResource && (
+        <ResourceDetailsModal
+          resource={selectedResource}
+          projectUuid={projectUuid}
+          open={showModal}
+          onOpenChange={setShowModal}
+        />
       )}
     </div>
   )
